@@ -1,0 +1,40 @@
+{
+  "project_info": {
+    "project_number": "351580308695",
+    "firebase_url": "https://crimereport-3b1b4.firebaseio.com",
+    "project_id": "crimereport-3b1b4",
+    "storage_bucket": "crimereport-3b1b4.appspot.com"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:351580308695:android:2f66ba2739fc6b59",
+        "android_client_info": {
+          "package_name": "com.crimenesia_public"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "351580308695-176cpcj3qb5h8lhgbjbn7ehill7v08fv.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyADKThVgBT1SHWozWTEJQz7k86v2fHGcic"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "351580308695-176cpcj3qb5h8lhgbjbn7ehill7v08fv.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

@@ -1,0 +1,2300 @@
+
+  var mysql      = require('mysql');
+   var connection = mysql.createConnection({
+    host     : 'localhost',
+     user     : 'root',
+     password : 'Pajero4d56_',
+     database : 'chatmessagemanager'
+   });
+   connection.connect(function(err){
+   if(!err) {
+       console.log("Database is connected ... nn");
+   } else {
+       console.log("Error connecting database ... nn");
+   }
+   });
+
+
+
+
+
+
+exports.retreivedataToday = function(req,res){
+  // console.log("req",req.body);
+
+
+
+
+
+        const cassandra = require('cassandra-driver');
+        var client = new cassandra.Client({contactPoints: ['127.0.0.1'], keyspace: 'entchat'});
+
+        var result = {"messages": []};
+
+        client.connect(function (err, result) {
+
+            if(err) {
+               console.log('Can not connect to Cassandra host - ', config.cassandra.host);
+               console.log('Error connecting cassandra is - ', err);
+            } else {
+               console.log('Successfully connected to cassandra.');
+            }
+        });
+
+
+        client.stream('SELECT * FROM messagebuffer ALLOW FILTERING ')
+          .on('readable', function () {
+            // 'readable' is emitted as soon a row is received and parsed
+            let row;
+            while (row = this.read()) {
+            //  console.log("Reading  "+row.message);
+
+              var strArray=row.message.split("|");
+
+
+              result["messages"].push({
+                   msgID:strArray[0] ,
+                   dateofTheWeek:row.dateoftheweek,
+                   timeStamp:strArray[1],
+                   userID:strArray[2],
+                   userName:strArray[3],
+                   message:strArray[4]
+
+               });
+
+            }
+          })
+          .on('end', function () {
+            // Stream ended, there aren't any more rows
+
+            console.log("Ended  ");
+
+
+            result["messages"].sort(function(a, b) {
+                var valueA = a.msgID; // ignore upper and lowercase
+                var valueB = b.msgID; // ignore upper and lowercase
+
+                 if (valueA < valueB) {
+
+                  return -1;
+                }
+                if (valueA > valueB) {
+                  return 1;
+                }
+
+                // names must be equal
+                return 0;
+              });
+
+             res.json(result);
+
+          })
+          .on('error', function (err) {
+            // Something went wrong: err is a response error from Cassandra
+            console.log("Error   "+err);
+
+          });
+
+
+
+}
+
+
+
+
+
+exports.retreivedatarange = function(req,res){
+  // console.log("req",req.body);
+
+  console.log("Read ranged msg>"+req.body.date);
+  var dateRangeArr=   this.getDateRange( req.body.date);
+
+  console.log("Start date of week >>>"+this.getStartDateOfWeek(req.body.date));
+
+        const cassandra = require('cassandra-driver');
+        var client = new cassandra.Client({contactPoints: ['127.0.0.1'], keyspace: 'entchat'});
+
+        var result = {"messages": []};
+
+
+
+        client.connect(function (err, result) {
+
+            if(err) {
+               console.log('Can not connect to Cassandra host - ', config.cassandra.host);
+               console.log('Error connecting cassandra is - ', err);
+            } else {
+               console.log('Successfully connected to cassandra.');
+            }
+        });
+
+
+
+      if(this.isThisWeek(req.body.date)){
+        console.log("This week");
+
+        client.stream('SELECT * FROM messagebuffer ALLOW FILTERING ')
+          .on('readable', function () {
+            // 'readable' is emitted as soon a row is received and parsed
+            let row;
+            while (row = this.read()) {
+          //    console.log("Reading  "+row.message);
+
+              var strArray=row.message.split("|");
+
+              result["messages"].push({
+                   msgID:strArray[0] ,
+                    dateofTheWeek:row.dateoftheweek,
+                   timeStamp:strArray[1],
+                   userID:strArray[2],
+                   userName:strArray[3],
+                   message:strArray[4]
+
+               });
+
+            }
+          })
+          .on('end', function () {
+            // Stream ended, there aren't any more rows
+
+            console.log("Ended  ");
+
+
+            res.json(result);
+
+
+          })
+          .on('error', function (err) {
+            // Something went wrong: err is a response error from Cassandra
+            console.log("Error   "+err);
+
+          });
+
+
+        }else{
+
+
+            console.log("Not this week ---->"+this.getStartDateOfWeek(req.body.date));
+          client.stream('SELECT * FROM messagestore where weekstartdate= ? ALLOW FILTERING', [ this.getStartDateOfWeek(req.body.date) ])
+            .on('readable', function () {
+              // 'readable' is emitted as soon a row is received and parsed
+              let row;
+              while (row = this.read()) {
+              //  console.log("Reading  "+row.message);
+
+                var strArray=row.message.split("|");
+
+
+                result["messages"].push({
+                     msgID:strArray[0] ,
+                     timeStamp:strArray[1],
+                     dateofTheWeek:row.dateoftheweek,
+                     userID:strArray[2],
+                     userName:strArray[3],
+                     message:strArray[4]
+
+                 });
+
+              }
+            })
+            .on('end', function () {
+              // Stream ended, there aren't any more rows
+              result["messages"].sort(function(a, b) {
+                  var valueA = a.msgID; // ignore upper and lowercase
+                  var valueB = b.msgID; // ignore upper and lowercase
+
+                   if (valueA < valueB) {
+
+                    return -1;
+                  }
+                  if (valueA > valueB) {
+                    return 1;
+                  }
+
+                  // names must be equal
+                  return 0;
+                });
+
+              console.log("Ended  ");
+
+
+
+              console.log("Sendign data >"+JSON.stringify(result));
+
+               res.json(result);
+
+            })
+            .on('error', function (err) {
+              // Something went wrong: err is a response error from Cassandra
+              console.log("Error   "+err);
+
+            });
+
+          }
+
+
+}
+
+exports.search = function(req,res){
+  // console.log("req",req.body);
+
+  console.log("Read keyword search msg>"+req.body.keyword);
+  console.log("Search dateeee>"+this.isThisWeek(req.body.date));
+  console.log("Search datsdsddseeee>"+req.body.date);
+
+        var sent=false;
+        const cassandra = require('cassandra-driver');
+        var client = new cassandra.Client({contactPoints: ['127.0.0.1'], keyspace: 'entchat'});
+
+        var result = {"messages": []};
+
+
+        var dataArray = [];
+        client.connect(function (err, result) {
+
+            if(err) {
+               console.log('Can not connect to Cassandra host - ', config.cassandra.host);
+               console.log('Error connecting cassandra is - ', err);
+            } else {
+               console.log('Successfully connected to cassandra.');
+            }
+        });
+
+
+
+
+        if(this.isThisWeek(req.body.date)){
+
+
+
+          client.stream('SELECT * FROM keywordindexbuffer ALLOW FILTERING')
+            .on('readable', function () {
+              // 'readable' is emitted as soon a row is received and parsed
+              let row;
+              while (row = this.read()){
+
+                console.log("DDDD --->"+row.keyword.toString().includes(req.body.keyword)+"  KW "+row.keyword.toString()+"    KW SENT  "+req.body.keyword);
+
+                if(row.keyword.toString().includes(req.body.keyword.toLowerCase())){
+
+
+                  var data= row.messageid;
+
+                //  console.log("DATA >>"+data);
+
+                   if(data.toString().includes(",")){
+                  //
+                  //
+                     var arrayTemp=data.toString().split(",");
+
+                  //
+                    for(var k =0 ;k< arrayTemp.length; k++){
+                      if(dataArray.includes(arrayTemp[k])){
+
+                      }else{
+
+                        dataArray.push(arrayTemp[k]);
+                      }
+                    }
+
+
+                   }else{
+                  //
+                    if(dataArray.includes(data)){
+
+                    }else{
+
+                      dataArray.push(data);
+                    }
+                  //
+                   }
+                }
+
+
+
+              }
+            })
+            .on('end', function () {
+              // Stream ended, there aren't any more rows
+
+              console.log("Ended  ");
+              console.log("Data array >"+dataArray);
+
+
+
+              for(var kk=0; kk < dataArray.length;kk++){
+
+
+                client.stream('SELECT * FROM messagebuffer where messageid = ? ALLOW FILTERING ',[ dataArray[kk]])
+                  .on('readable', function () {
+                    // 'readable' is emitted as soon a row is received and parsed
+                    let row;
+                    while (row = this.read()) {
+                    //  console.log("Reading msg "+row.message);
+
+                      var strArray=row.message.split("|");
+
+                      console.log("Date of the week >>>"+row.dateoftheweek);
+
+                      result["messages"].push({
+                           msgID:strArray[0] ,
+                           timeStamp:strArray[1],
+                           dateofTheWeek:row.dateoftheweek,
+
+                           userID:strArray[2],
+                           userName:strArray[3],
+                           message:strArray[4]+"|"+"keywordcontains12345"+"|"+req.body.keyword
+
+                       });
+
+                    }
+                  })
+                  .on('end', function () {
+                    // Stream ended, there aren't any more rows
+
+                    console.log("Ended reading row sdfsdsds "+kk);
+
+
+                    if(!sent){
+
+                      sent=true;
+                                  result["messages"].sort(function(a, b) {
+                                      var valueA = a.msgID; // ignore upper and lowercase
+                                      var valueB = b.msgID; // ignore upper and lowercase
+
+                                       if (valueA < valueB) {
+
+                                        return -1;
+                                      }
+                                      if (valueA > valueB) {
+                                        return 1;
+                                      }
+
+                                      // names must be equal
+                                      return 0;
+                                    });
+
+                                  res.json(result);
+                    }
+
+
+
+
+
+                  })
+                  .on('error', function (err) {
+                    // Something went wrong: err is a response error from Cassandra
+                    console.log("Error   "+err);
+
+                  });
+
+                  console.log("L   KKK  ->"+kk);
+              }
+
+
+
+
+
+
+
+
+
+
+            })
+            .on('error', function (err) {
+              // Something went wrong: err is a response error from Cassandra
+              console.log("Error   "+err);
+
+            });
+
+
+            console.log("Ended finally fin fin fin>>");
+
+        }else{
+
+
+
+          client.stream('SELECT * FROM keywordindexstore ALLOW FILTERING')
+            .on('readable', function () {
+              // 'readable' is emitted as soon a row is received and parsed
+              let row;
+              while (row = this.read()){
+
+                console.log("DDDD --->"+row.keyword.toString().includes(req.body.keyword));
+
+                if(row.keyword.toString().includes(req.body.keyword)){
+
+
+                  var data= row.messageid;
+
+                  console.log("DATA >>"+data);
+
+                   if(data.toString().includes(",")){
+                  //
+                  //
+                     var arrayTemp=data.toString().split(",");
+
+                  //
+                    for(var k =0 ;k< arrayTemp.length; k++){
+                      if(dataArray.includes(arrayTemp[k])){
+
+                      }else{
+
+                        dataArray.push(arrayTemp[k]);
+                      }
+                    }
+
+
+                   }else{
+                  //
+                    if(dataArray.includes(data)){
+
+                    }else{
+
+                      dataArray.push(data);
+                    }
+                  //
+                   }
+                }
+
+
+
+              }
+            })
+            .on('end', function () {
+              // Stream ended, there aren't any more rows
+
+              console.log("Ended  ");
+              console.log("Data array >"+dataArray);
+
+
+
+              for(var kk=0; kk < dataArray.length;kk++){
+
+
+                client.stream('SELECT * FROM messagestore where dateid = ? ALLOW FILTERING ',[ dataArray[kk]])
+                  .on('readable', function () {
+                    // 'readable' is emitted as soon a row is received and parsed
+                    let row;
+                    while (row = this.read()) {
+                    //  console.log("Reading msg "+row.message);
+
+                      var strArray=row.message.split("|");
+
+
+                      result["messages"].push({
+                           msgID:strArray[0] ,
+                           timeStamp:strArray[1],
+                           dateofTheWeek:row.dateoftheweek,
+
+                           userID:strArray[2],
+                           userName:strArray[3],
+                           message:strArray[4]+"|"+"keywordcontains12345"+"|"+req.body.keyword
+
+                       });
+
+                    }
+                  })
+                  .on('end', function () {
+                    // Stream ended, there aren't any more rows
+
+                    console.log("Ended reading row sdfsdsds "+kk);
+
+
+                    if(!sent){
+
+                      sent=true;
+                                  result["messages"].sort(function(a, b) {
+                                      var valueA = a.msgID; // ignore upper and lowercase
+                                      var valueB = b.msgID; // ignore upper and lowercase
+
+                                       if (valueA < valueB) {
+
+                                        return -1;
+                                      }
+                                      if (valueA > valueB) {
+                                        return 1;
+                                      }
+
+                                      // names must be equal
+                                      return 0;
+                                    });
+
+                                  res.json(result);
+                    }
+
+
+
+
+
+                  })
+                  .on('error', function (err) {
+                    // Something went wrong: err is a response error from Cassandra
+                    console.log("Error   "+err);
+
+                  });
+
+                  console.log("L   KKK  ->"+kk);
+              }
+
+
+
+
+
+
+
+
+
+
+            })
+            .on('error', function (err) {
+              // Something went wrong: err is a response error from Cassandra
+              console.log("Error   "+err);
+
+            });
+
+
+            console.log("Ended finally fin fin fin swearchr storesdsdsd>>");
+
+
+
+
+        }
+
+
+
+
+
+}
+
+
+
+
+
+
+exports.retreivekeyword = function(req,res){
+  // console.log("req",req.body);
+
+  console.log("Read keyword search msg>"+req.body.keyword);
+  console.log("Search dat>"+req.body.keyword);
+
+  var sent=false;
+        const cassandra = require('cassandra-driver');
+        var client = new cassandra.Client({contactPoints: ['127.0.0.1'], keyspace: 'entchat'});
+
+        var result = {"messages": []};
+
+
+        var dataArray = [];
+        client.connect(function (err, result) {
+
+            if(err) {
+               console.log('Can not connect to Cassandra host - ', config.cassandra.host);
+               console.log('Error connecting cassandra is - ', err);
+            } else {
+               console.log('Successfully connected to cassandra.');
+            }
+        });
+
+
+
+        client.stream('SELECT * FROM keywordindex ALLOW FILTERING')
+          .on('readable', function () {
+            // 'readable' is emitted as soon a row is received and parsed
+            let row;
+            while (row = this.read()){
+
+              if(row.keywords.toString().includes(req.body.keyword)){
+                console.log("Reading Thursdate "+row.thursday);
+
+
+                var data= row.thursday;
+
+                if(data.toString().includes(",")){
+
+
+                  var arrayTemp=data.toString().split(",");
+
+                  for(var k =0 ;k< arrayTemp.length; k++){
+                    if(dataArray.includes(arrayTemp[k])){
+
+                    }else{
+
+                      dataArray.push(arrayTemp[k]);
+                    }
+                  }
+
+
+                }else{
+
+                  if(dataArray.includes(data)){
+
+                  }else{
+
+                    dataArray.push(data);
+                  }
+
+                }
+              }
+
+
+             //  var strArray=row.message.split("|");
+
+              // result["messages"].push({
+              //      msgID:strArray[0] ,
+              //      timeStamp:strArray[1],
+              //      userID:strArray[2],
+              //      userName:strArray[3],
+              //      message:strArray[4]
+              //
+              //  });
+
+            }
+          })
+          .on('end', function () {
+            // Stream ended, there aren't any more rows
+
+            console.log("Ended  ");
+            console.log("Data array >"+dataArray);
+
+
+
+            for(var kk=0; kk < dataArray.length;kk++){
+
+
+              client.stream('SELECT * FROM messagebuffer where counter = ? ALLOW FILTERING ',[ dataArray[kk]],{ hints : ['int'] })
+                .on('readable', function () {
+                  // 'readable' is emitted as soon a row is received and parsed
+                  let row;
+                  while (row = this.read()) {
+                  //  console.log("Reading msg "+row.message);
+
+                    var strArray=row.message.split("|");
+
+
+                    result["messages"].push({
+                         msgID:strArray[0] ,
+                         timeStamp:strArray[1],
+                         userID:strArray[2],
+                         userName:strArray[3],
+                         message:strArray[4]
+
+                     });
+
+                  }
+                })
+                .on('end', function () {
+                  // Stream ended, there aren't any more rows
+
+                  console.log("Ended reading row sdfsdsds "+kk);
+
+
+                  if(!sent){
+
+                    sent=true;
+                                result["messages"].sort(function(a, b) {
+                                    var valueA = a.msgID; // ignore upper and lowercase
+                                    var valueB = b.msgID; // ignore upper and lowercase
+
+                                     if (valueA < valueB) {
+
+                                      return -1;
+                                    }
+                                    if (valueA > valueB) {
+                                      return 1;
+                                    }
+
+                                    // names must be equal
+                                    return 0;
+                                  });
+
+                                res.json(result);
+                  }
+
+
+
+
+
+                })
+                .on('error', function (err) {
+                  // Something went wrong: err is a response error from Cassandra
+                  console.log("Error   "+err);
+
+                });
+
+                console.log("L   KKK  ->"+kk);
+            }
+
+
+
+
+
+
+
+
+
+
+          })
+          .on('error', function (err) {
+            // Something went wrong: err is a response error from Cassandra
+            console.log("Error   "+err);
+
+          });
+
+
+          console.log("Ended finally fin fin fin>>");
+
+
+}
+
+
+
+
+
+exports.signupuser = function(req,res){
+  // console.log("req",req.body);
+
+
+
+  var user={
+    "Email":req.body.email,
+    "Password":req.body.password
+
+  }
+
+ const cassandra = require('cassandra-driver');
+ var client = new cassandra.Client({contactPoints: ['127.0.0.1'], keyspace: 'entchat'});
+
+
+
+
+ client.connect(function (err, result) {
+
+     if(err) {
+        console.log('Can not connect to Cassandra host - ', config.cassandra.host);
+        console.log('Error connecting cassandra is - ', err);
+     } else {
+        console.log('Successfully connected to cassandra.');
+     }
+ });
+
+ var isExist=false;
+
+
+
+
+
+
+
+
+
+ client.stream('SELECT * FROM user where email= ? ALLOW FILTERING', [ req.body.email ])
+   .on('readable', function () {
+     // 'readable' is emitted as soon a row is received and parsed
+     let row;
+     while (row = this.read()) {
+     //  console.log("Reading  "+row.message);
+
+     isExist=true;
+     res.send({
+              "message":"username-exists"
+                });
+
+                return;
+     }
+   })
+   .on('end', function () {
+     // Stream ended, there aren't any more rows
+     var botname='';
+
+     console.log("Ended  ");
+     if(!isExist){
+
+
+
+       const query = 'INSERT INTO user (email, password) VALUES (?, ?)';
+       const params = [req.body.email, req.body.password];
+       client.execute(query, params, { prepare: true }, function (err) {
+         //Inserted in the cluster
+       });
+
+
+
+
+
+
+
+       client.stream('SELECT * FROM telegrambot ALLOW FILTERING ')
+         .on('readable', function () {
+           // 'readable' is emitted as soon a row is received and parsed
+           let row;
+           row = this.read();
+           //  console.log("Reading  "+row.message);
+           botname=row.name;
+
+         })
+         .on('end', function () {
+           // Stream ended, there aren't any more rows
+
+
+           //
+           res.send({
+            "message":"registered-successfuly","botName":botname
+              });
+       //      res.json(result);
+
+         })
+         .on('error', function (err) {
+           // Something went wrong: err is a response error from Cassandra
+           console.log("Error   "+err);
+
+
+
+         });
+
+
+
+
+
+
+
+     }
+
+
+
+
+
+//      res.json(result);
+
+   })
+   .on('error', function (err) {
+     // Something went wrong: err is a response error from Cassandra
+     console.log("Error   "+err);
+
+
+
+   });
+
+
+
+
+   console.log("Search user in DB");
+
+
+  //
+  // res.send({
+  //  "message":"registered-successfuly","botName":"SSS"
+  //    });
+
+}
+
+
+exports.resetpassword = function(req,res){
+
+  console.log("Email >>>>>"+req.body.email);
+
+
+var nodemailer = require('nodemailer');
+
+var transporter = nodemailer.createTransport({
+ service: 'gmail',
+ auth: {
+        user: 'enterprisechatmanager@gmail.com',
+        pass: 'pajero4d56'
+    }
+});
+
+
+const mailOptions = {
+  from: 'Enterprise Chat Message Manager', // sender address
+  to: req.body.email, // list of receivers
+  subject: 'Entrprise Chat Message Manager', // Subject line
+  html: 'Please follow the link http://localhost:3000/changepassword to change the password'// plain text body
+};
+
+transporter.sendMail(mailOptions, function (err, info) {
+   if(err)
+     console.log(err)
+   else
+     console.log(info);
+});
+  res.send({
+   "message":"registered-successfuly","botName":"SSS"
+     });
+
+}
+
+exports.changepassword = function(req,res){
+
+  console.log("Password change >>>>>"+req.body.email);
+  const cassandra = require('cassandra-driver');
+  var client = new cassandra.Client({contactPoints: ['127.0.0.1'], keyspace: 'entchat'});
+
+  client.connect(function (err, result) {
+
+      if(err) {
+         console.log('Can not connect to Cassandra host - ', config.cassandra.host);
+         console.log('Error connecting cassandra is - ', err);
+      } else {
+         console.log('Successfully connected to cassandra.');
+      }
+  });
+
+
+  const query = 'UPDATE user SET password = ? WHERE email=?';
+  const params = [ req.body.password, req.body.email];
+  // Set the prepare flag in the query options
+  client.execute(query, params, { prepare: true })
+    .then(result => console.log('Row updated on the cluster'));
+
+  res.send({
+   "message":"registered-successfuly","botName":"SSS"
+     });
+
+}
+
+exports.loginuser = function(req,res){
+
+  console.log("Login user >>>");
+  var email= req.body.email;
+   var password = req.body.password;
+   const cassandra = require('cassandra-driver');
+   var client = new cassandra.Client({contactPoints: ['127.0.0.1'], keyspace: 'entchat'});
+
+   client.connect(function (err, result) {
+
+       if(err) {
+          console.log('Can not connect to Cassandra host - ', config.cassandra.host);
+          console.log('Error connecting cassandra is - ', err);
+       } else {
+          console.log('Successfully connected to cassandra.');
+       }
+   });
+
+   var isExist=false;
+
+
+   client.stream('SELECT * FROM user where email= ? ALLOW FILTERING', [ req.body.email ])
+   .on('readable', function () {
+     // 'readable' is emitted as soon a row is received and parsed
+     while (row = this.read()) {
+     //  console.log("Reading  "+row.message);
+
+      res.send({
+              "message":"success"
+                });
+
+                return;
+     }
+
+   })
+   .on('end', function () {
+     // Stream ended, there aren't any more rows
+
+
+   })
+   .on('error', function (err) {
+     // Something went wrong: err is a response error from Cassandra
+     console.log("Error   "+err);
+
+
+
+   });
+
+}
+
+getDateRange = function( date){
+
+
+  var dateRange=date.split(".");
+
+  console.log("Date Element >"+dateRange[0]);
+  console.log("Date Element >"+dateRange[1]);
+  console.log("Date Element >"+dateRange[2]);
+  console.log("Date Element >"+dateRange[3]);
+
+
+  var dd=new Date();
+
+  dd.setDate(dateRange[2]);
+  dd.setMonth((parseInt(dateRange[1])-1));
+  dd.setFullYear(dateRange[0]);
+
+
+
+
+  console.log("New date >"+dd);
+
+
+
+//console.log(JSON.stringify(arr));
+return "";
+}
+
+
+
+
+
+isThisWeek= function( date){
+
+
+  var dateArray=date.split(".");
+
+  var firstDate=this.getStartDateOfWeek(date);
+
+
+  var today= new Date();
+  var monthToday=today.getMonth()+1;
+  var dateToday=today.getDate();
+
+  if(parseInt(monthToday)<10){
+
+    monthToday="0"+monthToday;
+  }
+
+  if(parseInt(dateToday)<10){
+
+      dateToday="0"+dateToday;
+  }
+
+  var thisSunday= this.getStartDateOfWeek((today.getFullYear()+"."+monthToday+"."+dateToday))
+
+
+
+  console.log("This sunday  >"+(thisSunday));
+  console.log("first date  >"+firstDate);
+
+
+  return (thisSunday==firstDate);
+}
+
+
+getStartDateOfWeek= function( date){
+
+  var dateArray=date.split(".");
+  var dateNew = new Date(dateArray[0]+"-"+dateArray[1]+"-"+dateArray[2]);
+
+  var dt = dateNew; // current date of week
+
+  console.log("DATE START <<< --"+dateNew+" Current week day >"+dt.getDay());
+
+  var currentWeekDay = dt.getDay();
+  var lessDays = currentWeekDay == 0 ? 6 : currentWeekDay ;
+  var wkStart = new Date(new Date(dt).setDate(dt.getDate() - lessDays));
+  var wkEnd = new Date(new Date(wkStart).setDate(wkStart.getDate() + 6));
+
+  var mThisSunday = wkStart;
+
+
+
+      var month=mThisSunday.getMonth()+1;
+      var dateNow=mThisSunday.getDate();
+
+      if(parseInt(month)<10){
+
+        month="0"+month;
+      }
+
+      if(parseInt(dateNow)<10){
+
+          dateNow="0"+dateNow;
+      }
+
+
+   return mThisSunday.getFullYear()+"."+month+"."+dateNow
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  var mysql      = require('mysql');
+   var connection = mysql.createConnection({
+    host     : 'localhost',
+     user     : 'root',
+     password : 'Pajero4d56_',
+     database : 'chatmessagemanager'
+   });
+   connection.connect(function(err){
+   if(!err) {
+       console.log("Database is connected ... nn");
+   } else {
+       console.log("Error connecting database ... nn");
+   }
+   });
+
+
+
+
+
+
+exports.retreivedataToday = function(req,res){
+  // console.log("req",req.body);
+
+
+
+
+
+        const cassandra = require('cassandra-driver');
+        var client = new cassandra.Client({contactPoints: ['127.0.0.1'], keyspace: 'entchat'});
+
+        var result = {"messages": []};
+
+        client.connect(function (err, result) {
+
+            if(err) {
+               console.log('Can not connect to Cassandra host - ', config.cassandra.host);
+               console.log('Error connecting cassandra is - ', err);
+            } else {
+               console.log('Successfully connected to cassandra.');
+            }
+        });
+
+
+        client.stream('SELECT * FROM messagebuffer ALLOW FILTERING ')
+          .on('readable', function () {
+            // 'readable' is emitted as soon a row is received and parsed
+            let row;
+            while (row = this.read()) {
+            //  console.log("Reading  "+row.message);
+
+              var strArray=row.message.split("|");
+
+
+              result["messages"].push({
+                   msgID:strArray[0] ,
+                   dateofTheWeek:row.dateoftheweek,
+                   timeStamp:strArray[1],
+                   userID:strArray[2],
+                   userName:strArray[3],
+                   message:strArray[4]
+
+               });
+
+            }
+          })
+          .on('end', function () {
+            // Stream ended, there aren't any more rows
+
+            console.log("Ended  ");
+
+
+            result["messages"].sort(function(a, b) {
+                var valueA = a.msgID; // ignore upper and lowercase
+                var valueB = b.msgID; // ignore upper and lowercase
+
+                 if (valueA < valueB) {
+
+                  return -1;
+                }
+                if (valueA > valueB) {
+                  return 1;
+                }
+
+                // names must be equal
+                return 0;
+              });
+
+             res.json(result);
+
+          })
+          .on('error', function (err) {
+            // Something went wrong: err is a response error from Cassandra
+            console.log("Error   "+err);
+
+          });
+
+
+
+}
+
+
+
+
+
+exports.retreivedatarange = function(req,res){
+  // console.log("req",req.body);
+
+  console.log("Read ranged msg>"+req.body.date);
+  var dateRangeArr=   this.getDateRange( req.body.date);
+
+  console.log("Start date of week >>>"+this.getStartDateOfWeek(req.body.date));
+
+        const cassandra = require('cassandra-driver');
+        var client = new cassandra.Client({contactPoints: ['127.0.0.1'], keyspace: 'entchat'});
+
+        var result = {"messages": []};
+
+
+
+        client.connect(function (err, result) {
+
+            if(err) {
+               console.log('Can not connect to Cassandra host - ', config.cassandra.host);
+               console.log('Error connecting cassandra is - ', err);
+            } else {
+               console.log('Successfully connected to cassandra.');
+            }
+        });
+
+
+
+      if(this.isThisWeek(req.body.date)){
+        console.log("This week");
+
+        client.stream('SELECT * FROM messagebuffer ALLOW FILTERING ')
+          .on('readable', function () {
+            // 'readable' is emitted as soon a row is received and parsed
+            let row;
+            while (row = this.read()) {
+          //    console.log("Reading  "+row.message);
+
+              var strArray=row.message.split("|");
+
+              result["messages"].push({
+                   msgID:strArray[0] ,
+                    dateofTheWeek:row.dateoftheweek,
+                   timeStamp:strArray[1],
+                   userID:strArray[2],
+                   userName:strArray[3],
+                   message:strArray[4]
+
+               });
+
+            }
+          })
+          .on('end', function () {
+            // Stream ended, there aren't any more rows
+
+            console.log("Ended  ");
+
+
+            res.json(result);
+
+
+          })
+          .on('error', function (err) {
+            // Something went wrong: err is a response error from Cassandra
+            console.log("Error   "+err);
+
+          });
+
+
+        }else{
+
+
+            console.log("Not this week ---->"+this.getStartDateOfWeek(req.body.date));
+          client.stream('SELECT * FROM messagestore where weekstartdate= ? ALLOW FILTERING', [ this.getStartDateOfWeek(req.body.date) ])
+            .on('readable', function () {
+              // 'readable' is emitted as soon a row is received and parsed
+              let row;
+              while (row = this.read()) {
+              //  console.log("Reading  "+row.message);
+
+                var strArray=row.message.split("|");
+
+
+                result["messages"].push({
+                     msgID:strArray[0] ,
+                     timeStamp:strArray[1],
+                     dateofTheWeek:row.dateoftheweek,
+                     userID:strArray[2],
+                     userName:strArray[3],
+                     message:strArray[4]
+
+                 });
+
+              }
+            })
+            .on('end', function () {
+              // Stream ended, there aren't any more rows
+              result["messages"].sort(function(a, b) {
+                  var valueA = a.msgID; // ignore upper and lowercase
+                  var valueB = b.msgID; // ignore upper and lowercase
+
+                   if (valueA < valueB) {
+
+                    return -1;
+                  }
+                  if (valueA > valueB) {
+                    return 1;
+                  }
+
+                  // names must be equal
+                  return 0;
+                });
+
+              console.log("Ended  ");
+
+
+
+              console.log("Sendign data >"+JSON.stringify(result));
+
+               res.json(result);
+
+            })
+            .on('error', function (err) {
+              // Something went wrong: err is a response error from Cassandra
+              console.log("Error   "+err);
+
+            });
+
+          }
+
+
+}
+
+exports.search = function(req,res){
+  // console.log("req",req.body);
+
+  console.log("Read keyword search msg>"+req.body.keyword);
+  console.log("Search dateeee>"+this.isThisWeek(req.body.date));
+  console.log("Search datsdsddseeee>"+req.body.date);
+
+        var sent=false;
+        const cassandra = require('cassandra-driver');
+        var client = new cassandra.Client({contactPoints: ['127.0.0.1'], keyspace: 'entchat'});
+
+        var result = {"messages": []};
+
+
+        var dataArray = [];
+        var messageDateArray=[];
+        client.connect(function (err, result) {
+
+            if(err) {
+               console.log('Can not connect to Cassandra host - ', config.cassandra.host);
+               console.log('Error connecting cassandra is - ', err);
+            } else {
+               console.log('Successfully connected to cassandra.');
+            }
+        });
+
+
+
+
+        if(this.isThisWeek(req.body.date)){
+
+
+
+          client.stream('SELECT * FROM keywordindexbuffer ALLOW FILTERING')
+            .on('readable', function () {
+              // 'readable' is emitted as soon a row is received and parsed
+              let row;
+              while (row = this.read()){
+
+            //    console.log("DDDD --->"+row.keyword.toString().includes(req.body.keyword)+"  KW "+row.keyword.toString()+"    KW SENT  "+req.body.keyword);
+
+                if(row.keyword.toString().includes(req.body.keyword.toLowerCase())){
+
+
+                  var data= row.messageid;
+
+                //  console.log("DATA >>"+data);
+
+                   if(data.toString().includes(",")){
+                  //
+                  //
+                     var arrayTemp=data.toString().split(",");
+
+                  //
+                    for(var k =0 ;k< arrayTemp.length; k++){
+                      if(dataArray.includes(arrayTemp[k])){
+
+                      }else{
+
+                        dataArray.push(arrayTemp[k]);
+                      }
+                    }
+
+
+                   }else{
+                  //
+                    if(dataArray.includes(data)){
+
+                    }else{
+
+                      dataArray.push(data);
+                    }
+                  //
+                   }
+                }
+
+
+
+              }
+            })
+            .on('end', function () {
+              // Stream ended, there aren't any more rows
+
+              console.log("Ended  ");
+              console.log("Data array >"+dataArray);
+
+
+
+              for(var kk=0; kk < dataArray.length;kk++){
+
+
+                client.stream('SELECT * FROM messagebuffer where messageid = ? ALLOW FILTERING ',[ dataArray[kk]])
+                  .on('readable', function () {
+                    // 'readable' is emitted as soon a row is received and parsed
+                    let row;
+                    while (row = this.read()) {
+                    //  console.log("Reading msg "+row.message);
+
+                      var strArray=row.message.split("|");
+
+                      console.log("Date of the week >>>"+row.dateoftheweek);
+
+
+                      if(messageDateArray.includes(row.dateoftheweek)){
+
+                      }else{
+
+                        messageDateArray.push(row.dateoftheweek);
+                      }
+
+                      // result["messages"].push({
+                      //      msgID:strArray[0] ,
+                      //      timeStamp:strArray[1],
+                      //      dateofTheWeek:row.dateoftheweek,
+                      //
+                      //      userID:strArray[2],
+                      //      userName:strArray[3],
+                      //      message:strArray[4]+"|"+"keywordcontains12345"+"|"+req.body.keyword
+                      //
+                      //  });
+
+                    }
+                  })
+                  .on('end', function () {
+                    // Stream ended, there aren't any more rows
+
+                    console.log("Ended reading row sdfsdsds "+kk);
+
+
+
+                    console.log("The containing dates >"+messageDateArray);
+
+
+                        for(var l =0;l <messageDateArray.length;l++){
+
+
+
+
+                          client.stream('SELECT * FROM messagebuffer where dateoftheweek = ? ALLOW FILTERING ',[ messageDateArray[l]])
+                            .on('readable', function () {
+                              // 'readable' is emitted as soon a row is received and parsed
+                              let row;
+                              while (row = this.read()) {
+                              //  console.log("Reading msg "+row.message);
+
+                                var strArray=row.message.split("|");
+
+
+
+                                if(messageDateArray.includes(row.dateoftheweek)){
+
+                                }else{
+
+                                  messageDateArray.push(row.dateoftheweek);
+                                }
+
+                                result["messages"].push({
+                                     msgID:strArray[0] ,
+                                     timeStamp:strArray[1],
+                                     dateofTheWeek:row.dateoftheweek,
+
+                                     userID:strArray[2],
+                                     userName:strArray[3],
+                                     message:strArray[4]+"|"+"keywordcontains12345"+"|"+req.body.keyword
+
+                                 });
+
+                              }
+                            })
+                            .on('end', function () {
+                              // Stream ended, there aren't any more rows
+
+                              console.log("Ended reading row sdfsdsds "+kk);
+
+
+
+                              console.log("The containing dates >"+messageDateArray);
+
+
+
+                              if(!sent){
+
+                                sent=true;
+                                            result["messages"].sort(function(a, b) {
+                                                var valueA = a.msgID; // ignore upper and lowercase
+                                                var valueB = b.msgID; // ignore upper and lowercase
+
+                                                 if (valueA < valueB) {
+
+                                                  return -1;
+                                                }
+                                                if (valueA > valueB) {
+                                                  return 1;
+                                                }
+
+                                                // names must be equal
+                                                return 0;
+                                              });
+
+                                            res.json(result);
+                              }
+
+
+
+
+
+                            })
+                            .on('error', function (err) {
+                              // Something went wrong: err is a response error from Cassandra
+                              console.log("Error   "+err);
+
+                            });
+
+
+                        }
+
+
+
+
+
+                  })
+                  .on('error', function (err) {
+                    // Something went wrong: err is a response error from Cassandra
+                    console.log("Error   "+err);
+
+                  });
+
+                  console.log("L   KKK  ->"+kk);
+              }
+
+
+
+
+
+
+
+
+
+
+            })
+            .on('error', function (err) {
+              // Something went wrong: err is a response error from Cassandra
+              console.log("Error   "+err);
+
+            });
+
+
+            console.log("Ended finally fin fin fin>>");
+
+        }else{
+
+
+
+          client.stream('SELECT * FROM keywordindexstore ALLOW FILTERING')
+            .on('readable', function () {
+              // 'readable' is emitted as soon a row is received and parsed
+              let row;
+              while (row = this.read()){
+
+                //console.log("DDDD --->"+row.keyword.toString().includes(req.body.keyword));
+
+                if(row.keyword.toString().includes(req.body.keyword)){
+
+
+                  var data= row.messageid;
+
+                  console.log("DATA >>"+data);
+
+                   if(data.toString().includes(",")){
+                  //
+                  //
+                     var arrayTemp=data.toString().split(",");
+
+                  //
+                    for(var k =0 ;k< arrayTemp.length; k++){
+                      if(dataArray.includes(arrayTemp[k])){
+
+                      }else{
+
+                        dataArray.push(arrayTemp[k]);
+                      }
+                    }
+
+
+                   }else{
+                  //
+                    if(dataArray.includes(data)){
+
+                    }else{
+
+                      dataArray.push(data);
+                    }
+                  //
+                   }
+                }
+
+
+
+              }
+            })
+            .on('end', function () {
+              // Stream ended, there aren't any more rows
+
+              console.log("Ended  ");
+              console.log("Data array >"+dataArray);
+
+
+
+              for(var kk=0; kk < dataArray.length;kk++){
+
+
+                client.stream('SELECT * FROM messagestore where dateid = ? ALLOW FILTERING ',[ dataArray[kk]])
+                  .on('readable', function () {
+                    // 'readable' is emitted as soon a row is received and parsed
+                    let row;
+                    while (row = this.read()) {
+                    //  console.log("Reading msg "+row.message);
+
+                      var strArray=row.message.split("|");
+
+
+                      result["messages"].push({
+                           msgID:strArray[0] ,
+                           timeStamp:strArray[1],
+                           dateofTheWeek:row.dateoftheweek,
+
+                           userID:strArray[2],
+                           userName:strArray[3],
+                           message:strArray[4]+"|"+"keywordcontains12345"+"|"+req.body.keyword
+
+                       });
+
+                    }
+                  })
+                  .on('end', function () {
+                    // Stream ended, there aren't any more rows
+
+                    console.log("Ended reading row sdfsdsds "+kk);
+
+
+                    if(!sent){
+
+                      sent=true;
+                                  result["messages"].sort(function(a, b) {
+                                      var valueA = a.msgID; // ignore upper and lowercase
+                                      var valueB = b.msgID; // ignore upper and lowercase
+
+                                       if (valueA < valueB) {
+
+                                        return -1;
+                                      }
+                                      if (valueA > valueB) {
+                                        return 1;
+                                      }
+
+                                      // names must be equal
+                                      return 0;
+                                    });
+
+                                  res.json(result);
+                    }
+
+
+
+
+
+                  })
+                  .on('error', function (err) {
+                    // Something went wrong: err is a response error from Cassandra
+                    console.log("Error   "+err);
+
+                  });
+
+                  console.log("L   KKK  ->"+kk);
+              }
+
+
+
+
+
+
+
+
+
+
+            })
+            .on('error', function (err) {
+              // Something went wrong: err is a response error from Cassandra
+              console.log("Error   "+err);
+
+            });
+
+
+            console.log("Ended finally fin fin fin swearchr storesdsdsd>>");
+
+
+
+
+        }
+
+
+
+
+
+}
+
+
+
+
+
+
+exports.retreivekeyword = function(req,res){
+  // console.log("req",req.body);
+
+  console.log("Read keyword search msg>"+req.body.keyword);
+  console.log("Search dat>"+req.body.keyword);
+
+  var sent=false;
+        const cassandra = require('cassandra-driver');
+        var client = new cassandra.Client({contactPoints: ['127.0.0.1'], keyspace: 'entchat'});
+
+        var result = {"messages": []};
+
+
+        var dataArray = [];
+        client.connect(function (err, result) {
+
+            if(err) {
+               console.log('Can not connect to Cassandra host - ', config.cassandra.host);
+               console.log('Error connecting cassandra is - ', err);
+            } else {
+               console.log('Successfully connected to cassandra.');
+            }
+        });
+
+
+
+        client.stream('SELECT * FROM keywordindex ALLOW FILTERING')
+          .on('readable', function () {
+            // 'readable' is emitted as soon a row is received and parsed
+            let row;
+            while (row = this.read()){
+
+              if(row.keywords.toString().includes(req.body.keyword)){
+                console.log("Reading Thursdate "+row.thursday);
+
+
+                var data= row.thursday;
+
+                if(data.toString().includes(",")){
+
+
+                  var arrayTemp=data.toString().split(",");
+
+                  for(var k =0 ;k< arrayTemp.length; k++){
+                    if(dataArray.includes(arrayTemp[k])){
+
+                    }else{
+
+                      dataArray.push(arrayTemp[k]);
+                    }
+                  }
+
+
+                }else{
+
+                  if(dataArray.includes(data)){
+
+                  }else{
+
+                    dataArray.push(data);
+                  }
+
+                }
+              }
+
+
+             //  var strArray=row.message.split("|");
+
+              // result["messages"].push({
+              //      msgID:strArray[0] ,
+              //      timeStamp:strArray[1],
+              //      userID:strArray[2],
+              //      userName:strArray[3],
+              //      message:strArray[4]
+              //
+              //  });
+
+            }
+          })
+          .on('end', function () {
+            // Stream ended, there aren't any more rows
+
+            console.log("Ended  ");
+            console.log("Data array >"+dataArray);
+
+
+
+            for(var kk=0; kk < dataArray.length;kk++){
+
+
+              client.stream('SELECT * FROM messagebuffer where counter = ? ALLOW FILTERING ',[ dataArray[kk]],{ hints : ['int'] })
+                .on('readable', function () {
+                  // 'readable' is emitted as soon a row is received and parsed
+                  let row;
+                  while (row = this.read()) {
+                  //  console.log("Reading msg "+row.message);
+
+                    var strArray=row.message.split("|");
+
+
+                    result["messages"].push({
+                         msgID:strArray[0] ,
+                         timeStamp:strArray[1],
+                         userID:strArray[2],
+                         userName:strArray[3],
+                         message:strArray[4]
+
+                     });
+
+                  }
+                })
+                .on('end', function () {
+                  // Stream ended, there aren't any more rows
+
+                  console.log("Ended reading row sdfsdsds "+kk);
+
+
+                  if(!sent){
+
+                    sent=true;
+                                result["messages"].sort(function(a, b) {
+                                    var valueA = a.msgID; // ignore upper and lowercase
+                                    var valueB = b.msgID; // ignore upper and lowercase
+
+                                     if (valueA < valueB) {
+
+                                      return -1;
+                                    }
+                                    if (valueA > valueB) {
+                                      return 1;
+                                    }
+
+                                    // names must be equal
+                                    return 0;
+                                  });
+
+                                res.json(result);
+                  }
+
+
+
+
+
+                })
+                .on('error', function (err) {
+                  // Something went wrong: err is a response error from Cassandra
+                  console.log("Error   "+err);
+
+                });
+
+                console.log("L   KKK  ->"+kk);
+            }
+
+
+
+
+
+
+
+
+
+
+          })
+          .on('error', function (err) {
+            // Something went wrong: err is a response error from Cassandra
+            console.log("Error   "+err);
+
+          });
+
+
+          console.log("Ended finally fin fin fin>>");
+
+
+}
+
+
+
+
+
+exports.signupuser = function(req,res){
+  // console.log("req",req.body);
+
+
+
+  var user={
+    "Email":req.body.email,
+    "Password":req.body.password
+
+  }
+
+ const cassandra = require('cassandra-driver');
+ var client = new cassandra.Client({contactPoints: ['127.0.0.1'], keyspace: 'entchat'});
+
+
+
+
+ client.connect(function (err, result) {
+
+     if(err) {
+        console.log('Can not connect to Cassandra host - ', config.cassandra.host);
+        console.log('Error connecting cassandra is - ', err);
+     } else {
+        console.log('Successfully connected to cassandra.');
+     }
+ });
+
+ var isExist=false;
+
+
+
+
+
+
+
+
+
+ client.stream('SELECT * FROM user where email= ? ALLOW FILTERING', [ req.body.email ])
+   .on('readable', function () {
+     // 'readable' is emitted as soon a row is received and parsed
+     let row;
+     while (row = this.read()) {
+     //  console.log("Reading  "+row.message);
+
+     isExist=true;
+     res.send({
+              "message":"username-exists"
+                });
+
+                return;
+     }
+   })
+   .on('end', function () {
+     // Stream ended, there aren't any more rows
+     var botname='';
+
+     console.log("Ended  ");
+     if(!isExist){
+
+
+
+       const query = 'INSERT INTO user (email, password) VALUES (?, ?)';
+       const params = [req.body.email, req.body.password];
+       client.execute(query, params, { prepare: true }, function (err) {
+         //Inserted in the cluster
+       });
+
+
+
+
+
+
+
+       client.stream('SELECT * FROM telegrambot ALLOW FILTERING ')
+         .on('readable', function () {
+           // 'readable' is emitted as soon a row is received and parsed
+           let row;
+           row = this.read();
+           //  console.log("Reading  "+row.message);
+           botname=row.name;
+
+         })
+         .on('end', function () {
+           // Stream ended, there aren't any more rows
+
+
+           //
+           res.send({
+            "message":"registered-successfuly","botName":botname
+              });
+       //      res.json(result);
+
+         })
+         .on('error', function (err) {
+           // Something went wrong: err is a response error from Cassandra
+           console.log("Error   "+err);
+
+
+
+         });
+
+
+
+
+
+
+
+     }
+
+
+
+
+
+//      res.json(result);
+
+   })
+   .on('error', function (err) {
+     // Something went wrong: err is a response error from Cassandra
+     console.log("Error   "+err);
+
+
+
+   });
+
+
+
+
+   console.log("Search user in DB");
+
+
+  //
+  // res.send({
+  //  "message":"registered-successfuly","botName":"SSS"
+  //    });
+
+}
+
+
+exports.resetpassword = function(req,res){
+
+  console.log("Email >>>>>"+req.body.email);
+
+
+var nodemailer = require('nodemailer');
+
+var transporter = nodemailer.createTransport({
+ service: 'gmail',
+ auth: {
+        user: 'enterprisechatmanager@gmail.com',
+        pass: 'pajero4d56'
+    }
+});
+
+
+const mailOptions = {
+  from: 'Enterprise Chat Message Manager', // sender address
+  to: req.body.email, // list of receivers
+  subject: 'Entrprise Chat Message Manager', // Subject line
+  html: 'Please follow the link http://localhost:3000/changepassword to change the password'// plain text body
+};
+
+transporter.sendMail(mailOptions, function (err, info) {
+   if(err)
+     console.log(err)
+   else
+     console.log(info);
+});
+  res.send({
+   "message":"registered-successfuly","botName":"SSS"
+     });
+
+}
+
+exports.changepassword = function(req,res){
+
+  console.log("Password change >>>>>"+req.body.email);
+  const cassandra = require('cassandra-driver');
+  var client = new cassandra.Client({contactPoints: ['127.0.0.1'], keyspace: 'entchat'});
+
+  client.connect(function (err, result) {
+
+      if(err) {
+         console.log('Can not connect to Cassandra host - ', config.cassandra.host);
+         console.log('Error connecting cassandra is - ', err);
+      } else {
+         console.log('Successfully connected to cassandra.');
+      }
+  });
+
+
+  const query = 'UPDATE user SET password = ? WHERE email=?';
+  const params = [ req.body.password, req.body.email];
+  // Set the prepare flag in the query options
+  client.execute(query, params, { prepare: true })
+    .then(result => console.log('Row updated on the cluster'));
+
+  res.send({
+   "message":"registered-successfuly","botName":"SSS"
+     });
+
+}
+
+exports.loginuser = function(req,res){
+
+  console.log("Login user >>>");
+  var email= req.body.email;
+   var password = req.body.password;
+   const cassandra = require('cassandra-driver');
+   var client = new cassandra.Client({contactPoints: ['127.0.0.1'], keyspace: 'entchat'});
+
+   client.connect(function (err, result) {
+
+       if(err) {
+          console.log('Can not connect to Cassandra host - ', config.cassandra.host);
+          console.log('Error connecting cassandra is - ', err);
+       } else {
+          console.log('Successfully connected to cassandra.');
+       }
+   });
+
+   var isExist=false;
+
+
+   client.stream('SELECT * FROM user where email= ? ALLOW FILTERING', [ req.body.email ])
+   .on('readable', function () {
+     // 'readable' is emitted as soon a row is received and parsed
+     while (row = this.read()) {
+     //  console.log("Reading  "+row.message);
+
+      res.send({
+              "message":"success"
+                });
+
+                return;
+     }
+
+   })
+   .on('end', function () {
+     // Stream ended, there aren't any more rows
+
+
+   })
+   .on('error', function (err) {
+     // Something went wrong: err is a response error from Cassandra
+     console.log("Error   "+err);
+
+
+
+   });
+
+}
+
+getDateRange = function( date){
+
+
+  var dateRange=date.split(".");
+
+  console.log("Date Element >"+dateRange[0]);
+  console.log("Date Element >"+dateRange[1]);
+  console.log("Date Element >"+dateRange[2]);
+  console.log("Date Element >"+dateRange[3]);
+
+
+  var dd=new Date();
+
+  dd.setDate(dateRange[2]);
+  dd.setMonth((parseInt(dateRange[1])-1));
+  dd.setFullYear(dateRange[0]);
+
+
+
+
+  console.log("New date >"+dd);
+
+
+
+//console.log(JSON.stringify(arr));
+return "";
+}
+
+
+
+
+
+isThisWeek= function( date){
+
+
+  var dateArray=date.split(".");
+
+  var firstDate=this.getStartDateOfWeek(date);
+
+
+  var today= new Date();
+  var monthToday=today.getMonth()+1;
+  var dateToday=today.getDate();
+
+  if(parseInt(monthToday)<10){
+
+    monthToday="0"+monthToday;
+  }
+
+  if(parseInt(dateToday)<10){
+
+      dateToday="0"+dateToday;
+  }
+
+  var thisSunday= this.getStartDateOfWeek((today.getFullYear()+"."+monthToday+"."+dateToday))
+
+
+
+  console.log("This sunday  >"+(thisSunday));
+  console.log("first date  >"+firstDate);
+
+
+  return (thisSunday==firstDate);
+}
+
+
+getStartDateOfWeek= function( date){
+
+  var dateArray=date.split(".");
+  var dateNew = new Date(dateArray[0]+"-"+dateArray[1]+"-"+dateArray[2]);
+
+  var dt = dateNew; // current date of week
+
+  console.log("DATE START <<< --"+dateNew+" Current week day >"+dt.getDay());
+
+  var currentWeekDay = dt.getDay();
+  var lessDays = currentWeekDay == 0 ? 6 : currentWeekDay ;
+  var wkStart = new Date(new Date(dt).setDate(dt.getDate() - lessDays));
+  var wkEnd = new Date(new Date(wkStart).setDate(wkStart.getDate() + 6));
+
+  var mThisSunday = wkStart;
+
+
+
+      var month=mThisSunday.getMonth()+1;
+      var dateNow=mThisSunday.getDate();
+
+      if(parseInt(month)<10){
+
+        month="0"+month;
+      }
+
+      if(parseInt(dateNow)<10){
+
+          dateNow="0"+dateNow;
+      }
+
+
+   return mThisSunday.getFullYear()+"."+month+"."+dateNow
+}
