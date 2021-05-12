@@ -19,7 +19,7 @@
     "line-by-line": "^0.1.6",
     "mysql": "^2.15.0",
     "node-cassandra-cql": "^0.4.4",
-    "nodemailer": "^4.6.4",
+    "nodemailer": "^6.4.16",
     "socket.io-client": "^2.1.1"
   }
 }
